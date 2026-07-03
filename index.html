@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>夏恩公車</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial,sans-serif;margin:0;background:#111;color:#fff;text-align:center}
+.wrap{padding:18px 12px;max-width:420px;margin:auto}
+h1{font-size:30px;margin:12px 0 18px}.card{display:block;text-decoration:none;color:#fff;background:#222;border:1px solid #444;border-radius:22px;margin:12px 0;padding:18px 12px}
+.t{font-size:26px;font-weight:800}.route{font-size:20px;color:#ffdf64;font-weight:800;margin-top:4px}.s{font-size:16px;opacity:.88;line-height:1.45;margin-top:8px}.eta{font-size:24px;font-weight:900;margin-top:10px}.eta.green{color:#58ff7a}.eta.yellow{color:#ffd84a}.eta.red{color:#ff7474}.eta.gray{color:#aaa}.hint{font-size:13px;opacity:.72;margin-top:18px;line-height:1.5}.small{font-size:12px;opacity:.65;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🚌 夏恩公車</h1>
+
+<a class="card" href="https://pda5284.gov.taipei/MQS/route.jsp?rid=17740" data-routeid="17740" data-stop="崁頂三路">
+ <div class="t">🏠 夏恩回家</div><div class="route">957</div><div class="s">崁頂三路 → 輕軌濱海義山站</div><div class="eta gray">讀取中...</div>
+</a>
+<a class="card" href="https://pda5284.gov.taipei/MQS/route.jsp?rid=17740" data-routeid="17740" data-stop="輕軌濱海義山站">
+ <div class="t">🏠 夏恩上課</div><div class="route">957</div><div class="s">輕軌濱海義山站 → 崁頂三路</div><div class="eta gray">讀取中...</div>
+</a>
+<a class="card" href="https://pda5284.gov.taipei/MQS/route.jsp?rid=19088" data-routeid="19088" data-stop="義山路一段">
+ <div class="t">🏫 學校上課</div><div class="route">紅37</div><div class="s">義山路一段 → 淡海國小</div><div class="eta gray">讀取中...</div>
+</a>
+<a class="card" href="https://pda5284.gov.taipei/MQS/route.jsp?rid=17838" data-routeid="17838" data-stop="濱海義山路口">
+ <div class="t">🏫 學校上課</div><div class="route">894</div><div class="s">濱海義山路口 → 淡海國小</div><div class="eta gray">讀取中...</div>
+</a>
+<a class="card" href="https://pda5284.gov.taipei/MQS/route.jsp?rid=19088" data-routeid="19088" data-stop="淡海國小">
+ <div class="t">🎒 學校下課</div><div class="route">紅37</div><div class="s">淡海國小 → 義山路一段</div><div class="eta gray">讀取中...</div>
+</a>
+<a class="card" href="https://pda5284.gov.taipei/MQS/route.jsp?rid=17838" data-routeid="17838" data-stop="淡海國小">
+ <div class="t">🎒 學校下課</div><div class="route">894</div><div class="s">淡海國小 → 濱海義山路口</div><div class="eta gray">讀取中...</div>
+</a>
+<a class="card" href="https://pda5284.gov.taipei/MQS/route.jsp?rid=17570" data-routeid="17570" data-stop="淡海國小">
+ <div class="t">🎒 學校下課</div><div class="route">947</div><div class="s">淡海國小 → 大龜崙福德宮</div><div class="eta gray">讀取中...</div>
+</a>
+<div class="hint">資料來源：新北市公車預估到站時間，每 2 分鐘更新。點選卡片可開啟大臺北公車詳細頁。</div>
+<div class="small" id="updated"></div>
+</div>
+<script>
+const ETA_API='https://data.ntpc.gov.tw/api/datasets/07f7ccb3-ed00-43c4-966d-08e9dab24e95/json?page=0&size=100000';
+const STOP_API='https://data.ntpc.gov.tw/api/datasets/34b402a8-53d9-483d-9406-24a682c2d6dc/json?page=0&size=100000';
+function n(v){return String(v??'').trim()}
+function statusText(sec){
+  const s=Number(sec);
+  if(sec===undefined||sec===null||sec==='')return ['無資料','gray'];
+  if(s===-1)return ['未發車','gray'];
+  if(s===-2)return ['交管不停靠','red'];
+  if(s===-3)return ['末班已過','red'];
+  if(s===-4)return ['今日未營運','red'];
+  if(s<=60)return ['進站中','green'];
+  const m=Math.ceil(s/60);
+  return [m+' 分鐘',m<=5?'green':m<=10?'yellow':'red'];
+}
+async function refresh(){
+  const cards=[...document.querySelectorAll('.card')];
+  try{
+    const [etas,stops]=await Promise.all([fetch(ETA_API,{cache:'no-store'}).then(r=>r.json()),fetch(STOP_API,{cache:'no-store'}).then(r=>r.json())]);
+    for(const card of cards){
+      const route=n(card.dataset.routeid), stopName=n(card.dataset.stop), etaEl=card.querySelector('.eta');
+      const stopCandidates=stops.filter(x=>n(x.routeid)===route && n(x.namezh)===stopName);
+      const stopIds=new Set(stopCandidates.map(x=>n(x.id)));
+      const hit=etas.filter(x=>n(x.routeid)===route && stopIds.has(n(x.stopid))).sort((a,b)=>Number(a.estimatetime)-Number(b.estimatetime))[0];
+      const [txt,cls]=statusText(hit?.estimatetime);
+      etaEl.className='eta '+cls;
+      etaEl.textContent='🚍 '+txt;
+    }
+    document.getElementById('updated').textContent='更新：'+new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    document.querySelectorAll('.eta').forEach(el=>{el.className='eta gray';el.textContent='點我查即時';});
+    document.getElementById('updated').textContent='即時資料讀取失敗，點卡片可查詳細頁';
+  }
+}
+refresh();setInterval(refresh,120000);
+</script>
+</body>
+</html>
